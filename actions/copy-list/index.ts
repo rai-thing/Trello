@@ -1,4 +1,3 @@
-
 "use server";
 
 import { auth } from "@clerk/nextjs";
@@ -38,6 +37,8 @@ const handler = async (data: InputType): Promise<ReturnType> => {
       },
     });
 
+    listToCopy?.boardId;
+
     if (!listToCopy) {
       return { error: "List not found" };
     }
@@ -70,16 +71,27 @@ const handler = async (data: InputType): Promise<ReturnType> => {
       },
     });
 
+    await Promise.all(
+      list.cards.map(async (card) => {
+        await createAuditLog({
+          entityTitle: card.title,
+          entityId: card.id,
+          entityType: ENTITY_TYPE.CARD,
+          action: ACTION.COPY,
+        });
+      })
+    );
+
     await createAuditLog({
       entityTitle: list.title,
       entityId: list.id,
       entityType: ENTITY_TYPE.LIST,
-      action: ACTION.CREATE,
-    })
+      action: ACTION.COPY,
+    });
   } catch (error) {
     return {
-      error: "Failed to copy."
-    }
+      error: "Failed to copy.",
+    };
   }
 
   revalidatePath(`/board/${boardId}`);

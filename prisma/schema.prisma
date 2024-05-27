@@ -1,6 +1,6 @@
 datasource db {
   provider     = "postgresql"
-  url          = "postgresql://postgres:isagani21@localhost:5433/restapi"
+  url          = env("DATABASE_URL")
   relationMode = "prisma"
 }
 
@@ -57,6 +57,8 @@ model Comment {
   id         String      @id @default(uuid())
   text       String
   userId     String
+  userImage  String
+  userName   String
   entityId   String // ID of the entity the comment belongs to (e.g., board, list, card)
   entityType ENTITY_TYPE // Type of entity the comment belongs to (e.g., BOARD, LIST, CARD)
 
@@ -73,6 +75,7 @@ enum ACTION {
   MOVE
   ARCHIEVE
   SHARE
+  COPY
 }
 
 enum ENTITY_TYPE {

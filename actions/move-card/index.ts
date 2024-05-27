@@ -1,4 +1,4 @@
- "use server";
+"use server";
 
 import { auth } from "@clerk/nextjs";
 import { revalidatePath } from "next/cache";
@@ -20,45 +20,63 @@ const handler = async (data: InputType): Promise<ReturnType> => {
     };
   }
 
-  const { id, boardId } = data;
-  let list;
+  const { id, boardId, listIdDestination, items } = data;
+  let updatedCards;
 
   try {
-    // Fetch the list to be moved
-    const listToMove = await db.list.findUnique({
+    const cardToMove = await db.card.findUnique({
       where: {
-        id,
-        boardId,
-        board: {
-          orgId,
-        },
+        id: id,
       },
     });
 
-    if (!listToMove) {
-      return { error: "List not found" };
+    if (!cardToMove) {
+      return { error: "Card cannot be found." };
     }
 
-    // Implement move logic here, update the list's boardId or any other necessary changes
-    // For example, you can prompt the user to select the new board or list for moving
+    const transaction = items.map((card) =>
+      db.card.update({
+        where: {
+          id: card.id,
+          list: {
+            board: {
+              orgId,
+            },
+          },
+        },
+        data: {
+          order: card.order,
+          listId: card.listId,
+        },
+      })
+    );
 
-    // Update list's boardId (this is just a placeholder, replace with your actual move logic)
-    list = await db.list.update({
+    updatedCards = await db.$transaction(transaction);
+
+    const source = await db.list.findUnique({
       where: {
-        id,
-      },
-      data: {
-        boardId: "newBoardId", // Change to the new board's ID
+        id: cardToMove.listId,
       },
     });
 
-    await createAuditLog({
-      entityTitle: list.title,
-      entityId: list.id,
-      entityType: ENTITY_TYPE.LIST,
-      action: ACTION.MOVE_LIST, // Custom action type for moving lists
+    const destination = await db.list.findUnique({
+      where: {
+        id: listIdDestination,
+      },
     });
-    
+
+    Promise.all(
+      updatedCards.map(async (card) => {
+        await createAuditLog({
+          entityTitle: card.title,
+          entityId: card.id,
+          entityType: ENTITY_TYPE.CARD,
+          action: ACTION.MOVE,
+          destinationListId: destination?.title,
+          sourceListId: source?.title,
+        });
+      })
+    );
   } catch (error) {
     return {
       error: "Failed to move.",
@@ -67,8 +85,7 @@ const handler = async (data: InputType): Promise<ReturnType> => {
 
   // Revalidate path to update cache
   revalidatePath(`/board/${boardId}`);
-  return { data: list };
+  return { data: updatedCards };
 };
 
 export const moveCard = createSafeAction(MoveCard, handler);
-

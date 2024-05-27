@@ -8,6 +8,8 @@ import { createSafeAction } from "@/lib/create-safe-action";
 
 import { UpdateCardOrder } from "./schema";
 import { InputType, ReturnType } from "./types";
+import { createAuditLog } from "@/lib/create-audit-log";
+import { ACTION, ENTITY_TYPE } from "@prisma/client";
 
 const handler = async (data: InputType): Promise<ReturnType> => {
   const { userId, orgId } = auth();
@@ -18,11 +20,11 @@ const handler = async (data: InputType): Promise<ReturnType> => {
     };
   }
 
-  const { items, boardId, } = data;
+  const { items, boardId } = data;
   let updatedCards;
 
   try {
-    const transaction = items.map((card) => 
+    const transaction = items.map((card) =>
       db.card.update({
         where: {
           id: card.id,
@@ -36,14 +38,16 @@ const handler = async (data: InputType): Promise<ReturnType> => {
           order: card.order,
           listId: card.listId,
         },
-      }),
+      })
     );
 
     updatedCards = await db.$transaction(transaction);
+
+    console.log("moved card");
   } catch (error) {
     return {
-      error: "Failed to reorder."
-    }
+      error: "Failed to reorder.",
+    };
   }
 
   revalidatePath(`/board/${boardId}`);
